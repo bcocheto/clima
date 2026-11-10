@@ -70,3 +70,12 @@
 
 /* ── resultados da busca ── */
 .clima-busca { border-radius: 12px; }
+
+/* ── avisos oficiais (INMET) ── */
+.clima-alerta { border-left-width: 4px; }
+.clima-alerta.sev-potencial { border-left-color: #f5c211; }
+.clima-alerta.sev-perigo    { border-left-color: #ff7800; }
+.clima-alerta.sev-grande    { border-left-color: #e01b24; }
+.clima-chip.sev-potencial { background-color: #f5c211; color: #241f31; }
+.clima-chip.sev-perigo    { background-color: #ff7800; color: #241f31; }
+.clima-chip.sev-grande    { background-color: #e01b24; color: #ffffff; }

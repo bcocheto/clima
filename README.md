@@ -8,6 +8,7 @@ App de clima para GNOME (Python + GTK4 + libadwaita). Dados da [Open-Meteo](http
 - Dicas ao passar o mouse: cada hora do gráfico, cada dia e cada card explicam o que significam
 - Barra lateral com ícone e temperatura atual de cada cidade
 - Preferências (Ctrl+, ou menu ⋮): °C/°F, km/h/mph/m/s, alerta de chuva ligado/desligado, antecedência (30 min a 2 h) e intervalo de atualização (salvas em `~/.config/clima/config.json`)
+- Cidades no Brasil: avisos oficiais do INMET (severidade, riscos e o que fazer), comparação de máx/mín entre Open-Meteo, INMET e CPTEC/INPE, e notificação de aviso novo (pode ser desligado nas Preferências)
 - Alerta de chuva por notificação do sistema enquanto o app está aberto
 
 ## Rodar
@@ -27,3 +28,12 @@ cp data/io.github.bcocheto.Clima.desktop ~/.local/share/applications/
 ```bash
 python3 -m unittest discover -s tests
 ```
+
+## Fontes
+
+| Fonte | Uso |
+|---|---|
+| [Open-Meteo](https://open-meteo.com) | previsão principal e busca de cidades |
+| [INMET](https://apiprevmet3.inmet.gov.br) | avisos ativos e previsão por município (Brasil) |
+| [CPTEC/INPE](https://brasilapi.com.br) via BrasilAPI | previsão de 4 dias com índice UV (Brasil) |
+| [IBGE](https://servicodados.ibge.gov.br) | código do município, guardado em `~/.cache/clima/municipios.json` |

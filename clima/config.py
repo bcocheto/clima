@@ -10,6 +10,7 @@ PADRAO = {
     "alertas": True,  # notificação de chuva
     "antecedencia_min": 120,  # quão cedo avisar da chuva (30 | 60 | 120)
     "intervalo_min": 10,  # de quanto em quanto tempo atualizar (5 | 10 | 30)
+    "fontes_br": True,  # avisos e previsões oficiais (INMET, CPTEC) para cidades no Brasil
 }
 
 _UNIDADE_VENTO = {"kmh": ("km/h", 1.0), "mph": ("mph", 0.621371), "ms": ("m/s", 1 / 3.6)}
