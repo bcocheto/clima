@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.bcocheto.Clima</id>
+  <name>Clima</name>
+  <summary>Weather forecast for GNOME, with official alerts in Brazil</summary>
+  <summary xml:lang="pt">Previsão do tempo para o GNOME, com avisos oficiais no Brasil</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer id="io.github.bcocheto">
+    <name>Breno Cocheto</name>
+  </developer>
+
+  <description>
+    <p>Clima shows the current weather, the next 24 hours and a 7-day forecast for any city you add, with a native GNOME look that follows your light or dark theme and accent color.</p>
+    <p xml:lang="pt">O Clima mostra o tempo agora, as próximas 24 horas e a previsão de 7 dias das cidades que você adicionar, com visual nativo do GNOME que segue o tema claro ou escuro e a cor de destaque do sistema.</p>
+    <p>For cities in Brazil it also shows the active official alerts from INMET, with severity, risks and what to do, and compares the forecast of Open-Meteo, INMET and CPTEC/INPE side by side.</p>
+    <p xml:lang="pt">Para cidades no Brasil, mostra também os avisos oficiais ativos do INMET, com severidade, riscos e o que fazer, e compara lado a lado a previsão da Open-Meteo, do INMET e do CPTEC/INPE.</p>
+    <ul>
+      <li>Current conditions, hourly chart with rain chance and 7-day forecast</li>
+      <li xml:lang="pt">Clima atual, gráfico das horas com chance de chuva e previsão de 7 dias</li>
+      <li>Several cities, with search and the current temperature in the sidebar</li>
+      <li xml:lang="pt">Várias cidades, com busca e a temperatura atual na barra lateral</li>
+      <li>Rain and official alert notifications</li>
+      <li xml:lang="pt">Notificações de chuva e de avisos oficiais</li>
+      <li>Units in °C/°F and km/h, mph or m/s</li>
+      <li xml:lang="pt">Unidades em °C/°F e km/h, mph ou m/s</li>
+    </ul>
+    <p>The interface is in Brazilian Portuguese. Weather data by Open-Meteo.com (CC BY 4.0), INMET, CPTEC/INPE (via BrasilAPI) and IBGE.</p>
+    <p xml:lang="pt">Dados meteorológicos de Open-Meteo.com (CC BY 4.0), INMET, CPTEC/INPE (via BrasilAPI) e IBGE.</p>
+  </description>
+
+  <launchable type="desktop-id">io.github.bcocheto.Clima.desktop</launchable>
+  <provides>
+    <binary>clima</binary>
+  </provides>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/bcocheto/clima/main/docs/screenshots/01-principal.png</image>
+      <caption>Current weather, official alerts and the next 24 hours</caption>
+      <caption xml:lang="pt">Tempo agora, avisos oficiais e as próximas 24 horas</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/bcocheto/clima/main/docs/screenshots/03-aviso-inmet.png</image>
+      <caption>Official INMET alert with risks and instructions</caption>
+      <caption xml:lang="pt">Aviso oficial do INMET, com riscos e orientações</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/bcocheto/clima/main/docs/screenshots/02-comparar-fontes.png</image>
+      <caption>7-day forecast and comparison between sources</caption>
+      <caption xml:lang="pt">Previsão de 7 dias e comparação entre fontes</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/bcocheto/clima/main/docs/screenshots/04-tema-claro.png</image>
+      <caption>Light theme, rainy background</caption>
+      <caption xml:lang="pt">Tema claro, com fundo de chuva</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/bcocheto/clima/main/docs/screenshots/05-preferencias.png</image>
+      <caption>Preferences: units, alerts and official sources</caption>
+      <caption xml:lang="pt">Preferências: unidades, alertas e fontes oficiais</caption>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://github.com/bcocheto/clima</url>
+  <url type="bugtracker">https://github.com/bcocheto/clima/issues</url>
+  <url type="vcs-browser">https://github.com/bcocheto/clima</url>
+
+  <content_rating type="oars-1.1"/>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+    <internet>always</internet>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <control>touch</control>
+  </supports>
+
+  <releases>
+    <release version="0.1.1" date="2026-11-10">
+      <description>
+        <p>About dialog with data source credits, desktop and AppStream metadata, and Flatpak packaging.</p>
+        <p xml:lang="pt">Tela Sobre com os créditos das fontes de dados, metadados de desktop e AppStream e empacotamento Flatpak.</p>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-11-10">
+      <description>
+        <p>First release.</p>
+        <p xml:lang="pt">Primeira versão.</p>
+      </description>
+    </release>
+  </releases>
+</component>
