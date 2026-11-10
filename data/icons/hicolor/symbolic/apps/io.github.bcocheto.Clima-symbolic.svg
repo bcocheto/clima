@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <defs>
+    <mask id="recorte">
+      <rect width="16" height="16" fill="#fff"/>
+      <g fill="#000" stroke="#000" stroke-width="1.8">
+        <rect x="1.5" y="9" width="12" height="4.5" rx="2.25"/>
+        <circle cx="5.2" cy="8.8" r="2.6"/>
+        <circle cx="9" cy="8" r="3"/>
+      </g>
+    </mask>
+  </defs>
+  <g fill="#2e3436">
+    <circle cx="11.8" cy="4.2" r="2.7" mask="url(#recorte)"/>
+    <rect x="1.5" y="9" width="12" height="4.5" rx="2.25"/>
+    <circle cx="5.2" cy="8.8" r="2.6"/>
+    <circle cx="9" cy="8" r="3"/>
+  </g>
+</svg>

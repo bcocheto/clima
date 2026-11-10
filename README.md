@@ -17,16 +17,16 @@ App de clima para GNOME (Python + GTK4 + libadwaita). Dados da [Open-Meteo](http
 python3 -m clima
 ```
 
-Para as notificações aparecerem no GNOME, instale o `.desktop` (o ID precisa casar com `io.github.bcocheto.Clima`):
+Para ter o atalho no menu, o ícone e as notificações do GNOME (o ID precisa casar com `io.github.bcocheto.Clima`):
 
 ```bash
-cp data/io.github.bcocheto.Clima.desktop ~/.local/share/applications/
+make install     # make uninstall para remover
 ```
 
 ## Testes
 
 ```bash
-python3 -m unittest discover -s tests
+make test
 ```
 
 ## Fontes
@@ -37,3 +37,7 @@ python3 -m unittest discover -s tests
 | [INMET](https://apiprevmet3.inmet.gov.br) | avisos ativos e previsão por município (Brasil) |
 | [CPTEC/INPE](https://brasilapi.com.br) via BrasilAPI | previsão de 4 dias com índice UV (Brasil) |
 | [IBGE](https://servicodados.ibge.gov.br) | código do município, guardado em `~/.cache/clima/municipios.json` |
+
+## Licença
+
+GPL-3.0, como o [Gavetta](https://github.com/bcocheto/gavetta) e a [Cadência](https://github.com/bcocheto/cadencia).

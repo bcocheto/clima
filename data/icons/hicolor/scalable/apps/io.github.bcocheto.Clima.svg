@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7cb2f2"/>
+      <stop offset="0.55" stop-color="#3584e4"/>
+      <stop offset="1" stop-color="#1a5fb4"/>
+    </linearGradient>
+    <linearGradient id="sol" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f9f06b"/>
+      <stop offset="1" stop-color="#f5a30a"/>
+    </linearGradient>
+    <linearGradient id="nuvem" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d6e4f7"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#fundo)"/>
+  <rect x="8.5" y="8.5" width="111" height="111" rx="27.5" fill="none" stroke="#ffffff" stroke-opacity="0.18"/>
+  <!-- sol -->
+  <circle cx="84" cy="50" r="31" fill="#f9f06b" fill-opacity="0.22"/>
+  <circle cx="84" cy="50" r="22" fill="url(#sol)"/>
+  <!-- nuvem (sombra e corpo) -->
+  <g fill="#0b3a7a" fill-opacity="0.28" transform="translate(0 3)">
+    <rect x="26" y="78" width="78" height="26" rx="13"/>
+    <circle cx="50" cy="76" r="17"/>
+    <circle cx="75" cy="70" r="21"/>
+  </g>
+  <g fill="url(#nuvem)">
+    <rect x="26" y="78" width="78" height="26" rx="13"/>
+    <circle cx="50" cy="76" r="17"/>
+    <circle cx="75" cy="70" r="21"/>
+  </g>
+</svg>

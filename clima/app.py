@@ -4,6 +4,8 @@ from pathlib import Path
 from gi.repository import Adw, Gdk, Gtk
 
 from . import APP_ID
+
+ICONES = Path(__file__).resolve().parent.parent / "data" / "icons"
 from .janela import Janela
 
 
@@ -13,6 +15,10 @@ class App(Adw.Application):
 
     def do_startup(self):
         Adw.Application.do_startup(self)
+        # ícone do app também quando rodando direto do código-fonte
+        if ICONES.is_dir():
+            Gtk.IconTheme.get_for_display(Gdk.Display.get_default()).add_search_path(str(ICONES))
+        Gtk.Window.set_default_icon_name(APP_ID)
         css = Gtk.CssProvider()
         css.load_from_string(Path(__file__).with_name("estilo.css").read_text(encoding="utf-8"))
         Gtk.StyleContext.add_provider_for_display(
