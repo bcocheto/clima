@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Clima
+Comment=Previsão do tempo
+Exec=python3 -m clima
+Icon=weather-clear-symbolic
+Categories=GNOME;GTK;Utility;
+StartupNotify=true
+DBusActivatable=false
