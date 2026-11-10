@@ -38,3 +38,18 @@ def descrever(codigo, dia=True):
     if not dia and icone in ("weather-clear", "weather-few-clouds"):
         icone += "-night"
     return nome, f"{icone}-symbolic"
+
+
+def ambiente(codigo, dia=True):
+    """Classe CSS do fundo (degradê) conforme o tempo."""
+    if codigo in (95, 96, 99):
+        return "tempestade"
+    if codigo in (71, 73, 75, 77, 85, 86):
+        return "neve"
+    if codigo in (51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82):
+        return "chuva"
+    if codigo in (45, 48):
+        return "neblina"
+    if codigo == 3:
+        return "nublado"
+    return "ceu-limpo-dia" if dia else "ceu-limpo-noite"

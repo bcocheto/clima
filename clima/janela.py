@@ -4,7 +4,7 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk
 
 from . import api, modelo
 from .busca import DialogoBusca
-from .codigos import descrever
+from .codigos import ambiente, descrever
 from .grafico import Grafico, grau
 from .store import Store, chave
 
@@ -27,6 +27,10 @@ def em_thread(trabalho, ok, erro):
     threading.Thread(target=run, daemon=True).start()
 
 
+def rotulo(texto="", classes=(), **kw):
+    return Gtk.Label(label=texto, xalign=0, css_classes=list(classes), **kw)
+
+
 class Janela(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(
@@ -36,7 +40,7 @@ class Janela(Adw.ApplicationWindow):
         self.dados = {}  # cache por chave da cidade
         self.cidade = None
         self.avisados = set()
-        self._linhas_dias = []
+        self._ambiente = None
         self._montar()
         self._popular_cidades(0)
         GLib.timeout_add_seconds(INTERVALO_CHUVA_S, self._tick_chuva)
@@ -58,16 +62,17 @@ class Janela(Adw.ApplicationWindow):
         add.connect("clicked", self._abrir_busca)
         head.pack_start(add)
         sb.add_top_bar(head)
-        self.lista = Gtk.ListBox(css_classes=["navigation-sidebar"])
+        self.lista = Gtk.ListBox(css_classes=["clima-cidades"])
         self.lista.connect("row-selected", self._ao_selecionar)
         sb.set_content(Gtk.ScrolledWindow(child=self.lista))
         self.split.set_sidebar(sb)
 
         # conteúdo
-        tv = Adw.ToolbarView()
-        head = Adw.HeaderBar()
+        tv = Adw.ToolbarView(extend_content_to_top_edge=True)
+        head = Adw.HeaderBar(show_title=False)
+        head.add_css_class("flat")
         toggle = Gtk.ToggleButton(
-            icon_name="sidebar-show-symbolic", tooltip_text="Mostrar cidades"
+            icon_name="view-sidebar-start-symbolic", tooltip_text="Mostrar cidades", active=True
         )
         toggle.bind_property(
             "active",
@@ -103,52 +108,99 @@ class Janela(Adw.ApplicationWindow):
 
     def _montar_dados(self):
         box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL, spacing=18,
-            margin_top=18, margin_bottom=24, margin_start=18, margin_end=18,
+            orientation=Gtk.Orientation.VERTICAL, spacing=10,
+            margin_top=56, margin_bottom=24, margin_start=18, margin_end=18,
         )
 
-        self.lbl_cidade = Gtk.Label(xalign=0, css_classes=["title-1"])
-        self.lbl_regiao = Gtk.Label(xalign=0, css_classes=["dim-label"])
-        titulo = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        titulo.append(self.lbl_cidade)
-        titulo.append(self.lbl_regiao)
-        box.append(titulo)
+        # topo: cidade + clima atual (estilo app Clima do Windows)
+        box.append(rotulo(classes=["title-2"]))
+        self.lbl_cidade = box.get_last_child()
+        self.lbl_regiao = rotulo(classes=["clima-meta"])
+        box.append(self.lbl_regiao)
 
-        hero = Gtk.Box(spacing=18)
-        self.img_atual = Gtk.Image(pixel_size=96)
+        hero = Gtk.Box(spacing=20, margin_top=6, margin_bottom=6)
+        self.img_atual = Gtk.Image(pixel_size=112)
         hero.append(self.img_atual)
-        col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER)
-        self.lbl_temp = Gtk.Label(xalign=0, use_markup=True)
-        self.lbl_desc = Gtk.Label(xalign=0, css_classes=["title-3"])
-        col.append(self.lbl_temp)
-        col.append(self.lbl_desc)
+        col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, valign=Gtk.Align.CENTER, spacing=2)
+        self.lbl_temp = rotulo(classes=["clima-temp"])
+        self.lbl_desc = rotulo(classes=["title-3"])
+        chips = Gtk.Box(spacing=6, margin_top=4)
+        self.chip_minmax = rotulo(classes=["clima-chip"])
+        self.chip_sensacao = rotulo(classes=["clima-chip"])
+        chips.append(self.chip_minmax)
+        chips.append(self.chip_sensacao)
+        for w in (self.lbl_temp, self.lbl_desc, chips):
+            col.append(w)
         hero.append(col)
         box.append(hero)
 
-        agora = Adw.PreferencesGroup(title="Agora")
-        self.row_sensacao = self._row_info("Sensação térmica")
-        self.row_umidade = self._row_info("Umidade")
-        self.row_vento = self._row_info("Vento")
-        self.row_chuva = self._row_info("Chuva")
-        for r in (self.row_sensacao, self.row_umidade, self.row_vento, self.row_chuva):
-            agora.add(r)
-        box.append(agora)
+        # aviso de chuva
+        self.aviso = Gtk.Box(spacing=10, css_classes=["clima-card", "clima-aviso"])
+        self.aviso_icone = Gtk.Image(pixel_size=20)
+        self.aviso_texto = rotulo(wrap=True, hexpand=True)
+        self.aviso.append(self.aviso_icone)
+        self.aviso.append(self.aviso_texto)
+        box.append(self.aviso)
 
-        horas = Adw.PreferencesGroup(title="Próximas 24 horas")
+        # detalhes em tiles
+        tiles = Gtk.FlowBox(
+            selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
+            min_children_per_line=2, max_children_per_line=4,
+            column_spacing=8, row_spacing=8,
+        )
+        self.val_sensacao = self._tile(tiles, "Sensação térmica")
+        self.val_umidade = self._tile(tiles, "Umidade")
+        self.val_vento = self._tile(tiles, "Vento")
+        self.val_chuva = self._tile(tiles, "Chance de chuva hoje")
+        box.append(tiles)
+
+        # próximas horas
+        box.append(rotulo("Próximas 24 horas", ["clima-secao"]))
+        card = Gtk.Box(css_classes=["clima-card"])
         self.grafico = Grafico()
-        card = Gtk.Box(css_classes=["card"])
         card.append(self.grafico)
-        horas.add(card)
-        box.append(horas)
+        box.append(card)
 
-        self.grupo_dias = Adw.PreferencesGroup(title="Próximos 7 dias")
-        box.append(self.grupo_dias)
+        # próximos dias
+        box.append(rotulo("Próximos 7 dias", ["clima-secao"]))
+        self.dias_box = Gtk.FlowBox(
+            selection_mode=Gtk.SelectionMode.NONE, homogeneous=True,
+            min_children_per_line=2, max_children_per_line=7,
+            column_spacing=8, row_spacing=8,
+        )
+        box.append(self.dias_box)
 
-        return Gtk.ScrolledWindow(child=Adw.Clamp(maximum_size=720, child=box))
+        self.fundo = Gtk.ScrolledWindow(
+            child=Adw.Clamp(maximum_size=960, child=box), css_classes=["clima-fundo"]
+        )
+        return self.fundo
 
     @staticmethod
-    def _row_info(titulo):
-        return Adw.ActionRow(title=titulo, subtitle="—", css_classes=["property"])
+    def _tile(flowbox, titulo):
+        tile = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, css_classes=["clima-card"])
+        tile.append(rotulo(titulo, ["clima-meta"]))
+        valor = rotulo(classes=["clima-valor"])
+        tile.append(valor)
+        flowbox.append(tile)
+        return valor
+
+    @staticmethod
+    def _tile_dia(i, d):
+        nome, icone = descrever(d["codigo"])
+        tile = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL, spacing=4,
+            css_classes=["clima-card", "clima-dia"], tooltip_text=nome,
+        )
+        rot = rotulo(modelo.nome_dia(i, d["data"]), ["heading"])
+        rot.set_halign(Gtk.Align.CENTER)
+        tile.append(rot)
+        tile.append(Gtk.Image(icon_name=icone, pixel_size=32, margin_top=2, margin_bottom=2))
+        for texto, classe in ((grau(d["max"]), "clima-valor"), (grau(d["min"]), "clima-meta"),
+                              (f'{d["chuva"]}%', "clima-chuva-pct")):
+            r = rotulo(texto, [classe])
+            r.set_halign(Gtk.Align.CENTER)
+            tile.append(r)
+        return tile
 
     # ---------- cidades ----------
     def _popular_cidades(self, selecionar):
@@ -158,7 +210,7 @@ class Janela(Adw.ApplicationWindow):
             row = Adw.ActionRow(title=c["nome"], subtitle=c["regiao"], use_markup=False)
             rm = Gtk.Button(
                 icon_name="list-remove-symbolic", valign=Gtk.Align.CENTER,
-                css_classes=["flat"], tooltip_text="Remover",
+                css_classes=["flat", "circular"], tooltip_text="Remover",
             )
             rm.connect("clicked", lambda _b, c=c: self._remover(c))
             row.add_suffix(rm)
@@ -214,36 +266,44 @@ class Janela(Adw.ApplicationWindow):
         atual = d["current"]
         dia = bool(atual.get("is_day", 1))
         desc, icone = descrever(atual["weather_code"], dia)
+        dias = modelo.dias(d)
+
+        # fundo conforme o tempo
+        novo = ambiente(atual["weather_code"], dia)
+        if novo != self._ambiente:
+            if self._ambiente:
+                self.fundo.remove_css_class(self._ambiente)
+            self.fundo.add_css_class(novo)
+            self._ambiente = novo
+
         self.lbl_cidade.set_label(cidade["nome"])
         self.lbl_regiao.set_label(cidade["regiao"])
         self.img_atual.set_from_icon_name(icone)
-        self.lbl_temp.set_markup(
-            f'<span size="64000" weight="bold">{grau(atual["temperature_2m"])}</span>'
-        )
+        self.lbl_temp.set_label(grau(atual["temperature_2m"]))
         self.lbl_desc.set_label(desc)
-        self.row_sensacao.set_subtitle(grau(atual["apparent_temperature"]))
-        self.row_umidade.set_subtitle(f'{atual["relative_humidity_2m"]:.0f}%')
-        self.row_vento.set_subtitle(f'{atual["wind_speed_10m"]:.0f} km/h')
-        self.row_chuva.set_subtitle(self._texto_chuva(modelo.chuva_em_minutos(d)))
+        self.chip_minmax.set_label(f'Máx {grau(dias[0]["max"])} · Mín {grau(dias[0]["min"])}')
+        self.chip_sensacao.set_label(f'Sensação {grau(atual["apparent_temperature"])}')
+
+        self.val_sensacao.set_label(grau(atual["apparent_temperature"]))
+        self.val_umidade.set_label(f'{atual["relative_humidity_2m"]:.0f}%')
+        self.val_vento.set_label(f'{atual["wind_speed_10m"]:.0f} km/h')
+        self.val_chuva.set_label(f'{dias[0]["chuva"]}%')
+
+        minutos = modelo.chuva_em_minutos(d)
+        self.aviso_texto.set_label(self._texto_chuva(minutos))
+        self.aviso_icone.set_from_icon_name(
+            "weather-showers-symbolic" if minutos is not None else "weather-clear-symbolic"
+        )
+        if minutos is not None:
+            self.aviso.add_css_class("chuva")
+        else:
+            self.aviso.remove_css_class("chuva")
 
         self.grafico.set_horas(modelo.horas_seguintes(d))
 
-        for r in self._linhas_dias:
-            self.grupo_dias.remove(r)
-        self._linhas_dias = []
-        for i, dia_d in enumerate(modelo.dias(d)):
-            nome, ic = descrever(dia_d["codigo"])
-            row = Adw.ActionRow(
-                title=modelo.nome_dia(i, dia_d["data"]),
-                subtitle=f'{nome} · chuva {dia_d["chuva"]}%',
-            )
-            row.add_prefix(Gtk.Image(icon_name=ic, pixel_size=24))
-            row.add_suffix(
-                Gtk.Label(label=f'{grau(dia_d["max"])} / {grau(dia_d["min"])}',
-                          css_classes=["numeric"])
-            )
-            self.grupo_dias.add(row)
-            self._linhas_dias.append(row)
+        self.dias_box.remove_all()
+        for i, dia_d in enumerate(dias):
+            self.dias_box.append(self._tile_dia(i, dia_d))
 
         self.stack.set_visible_child_name("dados")
 
