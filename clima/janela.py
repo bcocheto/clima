@@ -1,8 +1,9 @@
 import threading
+import time
 
 from gi.repository import Adw, Gio, GLib, GObject, Gtk
 
-from . import api, modelo
+from . import api, fontes, modelo
 from .busca import DialogoBusca
 from .codigos import ambiente, descrever
 from .config import cfg
@@ -43,6 +44,11 @@ class Janela(Adw.ApplicationWindow):
         self._ambiente = None
         self._linhas = {}  # chave da cidade -> (ícone, temperatura) na barra lateral
         self._timer = None
+        self.oficiais = {}  # chave da cidade -> {"avisos", "inmet", "cptec"} (None/ausente = carregando, False = falhou)
+        self._oficiais_t = {}  # quando as previsões oficiais foram pedidas
+        self._avisos_cache = (0, [])
+        self._avisos_vistos = {}  # chave -> ids de avisos já conhecidos
+        self._lock = threading.Lock()
 
         acao = Gio.SimpleAction.new("preferencias", None)
         acao.connect("activate", lambda *_: Preferencias(self._ao_mudar_config).present(self))
@@ -154,6 +160,13 @@ class Janela(Adw.ApplicationWindow):
         hero.append(col)
         box.append(hero)
 
+        # avisos oficiais (INMET) — só para cidades no Brasil
+        self.secao_avisos = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.secao_avisos.append(rotulo("Avisos oficiais · INMET", ["clima-secao"]))
+        self.avisos_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.secao_avisos.append(self.avisos_box)
+        box.append(self.secao_avisos)
+
         # aviso de chuva
         self.aviso = Gtk.Box(spacing=10, css_classes=["clima-card", "clima-aviso"])
         self.aviso_icone = Gtk.Image(pixel_size=20)
@@ -204,6 +217,18 @@ class Janela(Adw.ApplicationWindow):
             column_spacing=8, row_spacing=8,
         )
         box.append(self.dias_box)
+
+        # comparação entre fontes — só para cidades no Brasil
+        self.secao_fontes = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.secao_fontes.append(rotulo("Comparar fontes", ["clima-secao"]))
+        card_fontes = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10,
+                              css_classes=["clima-card"])
+        self.grade_fontes = Gtk.Grid(column_spacing=12, row_spacing=10, column_homogeneous=True)
+        card_fontes.append(self.grade_fontes)
+        self.rodape_fontes = rotulo(classes=["clima-meta"], wrap=True)
+        card_fontes.append(self.rodape_fontes)
+        self.secao_fontes.append(card_fontes)
+        box.append(self.secao_fontes)
 
         self.fundo = Gtk.ScrolledWindow(
             child=Adw.Clamp(maximum_size=960, child=box), css_classes=["clima-fundo"]
@@ -308,6 +333,7 @@ class Janela(Adw.ApplicationWindow):
         if cidade is None:
             return
         k = chave(cidade)
+        self._buscar_oficiais(cidade, previsoes=True, forcar=forcar)
         if k in self.dados and not forcar:
             self._mostrar(cidade, self.dados[k])
             return
@@ -374,6 +400,7 @@ class Janela(Adw.ApplicationWindow):
             self.dias_box.append(self._tile_dia(i, dia_d))
 
         self.stack.set_visible_child_name("dados")
+        self._mostrar_oficiais()
 
     @staticmethod
     def _texto_chuva(minutos):
@@ -390,6 +417,8 @@ class Janela(Adw.ApplicationWindow):
         if self.cidade is not None and chave(self.cidade) in self.dados:
             self._mostrar(self.cidade, self.dados[chave(self.cidade)])
         self._armar_timer()
+        if self.cidade is not None:
+            self._buscar_oficiais(self.cidade)
 
     def _armar_timer(self):
         if self._timer:
@@ -423,6 +452,8 @@ class Janela(Adw.ApplicationWindow):
         if self.cidade is not None and chave(self.cidade) == k:
             self._mostrar(self.cidade, d)
         self._avisar_chuva(cidade, d)
+        atual = self.cidade is not None and chave(self.cidade) == k
+        self._buscar_oficiais(cidade, previsoes=atual)
 
     def _avisar_chuva(self, cidade, d):
         if not cfg.get("alertas"):
@@ -439,3 +470,213 @@ class Janela(Adw.ApplicationWindow):
         n.set_body(self._texto_chuva(minutos) + ".")
         n.set_icon(Gio.ThemedIcon.new("weather-showers-symbolic"))
         self.get_application().send_notification(f"chuva-{k}", n)
+
+    # ---------- fontes oficiais (Brasil) ----------
+    def _fontes_ativas(self, cidade):
+        return bool(cfg.get("fontes_br")) and fontes.no_brasil(cidade)
+
+    def _avisos_todos(self):
+        """Lista de avisos do INMET; baixada no máximo a cada 5 min e compartilhada."""
+        with self._lock:
+            t, lista = self._avisos_cache
+            if time.time() - t < 300:
+                return lista
+            lista = fontes.baixar_avisos()
+            self._avisos_cache = (time.time(), lista)
+            return lista
+
+    def _buscar_oficiais(self, cidade, previsoes=True, forcar=False):
+        if not self._fontes_ativas(cidade):
+            return
+        k = chave(cidade)
+        agora = time.time()
+        previsoes = previsoes and (forcar or agora - self._oficiais_t.get(k, 0) > 1800)
+        if previsoes:
+            self._oficiais_t[k] = agora
+
+        def trabalho():
+            res = {}
+            try:
+                res["ibge"] = fontes.achar_ibge(cidade)
+            except Exception:
+                res["ibge"] = None
+            try:
+                res["avisos"] = fontes.avisos_da_cidade(
+                    self._avisos_todos(), cidade, res["ibge"]
+                )
+            except Exception:
+                res["avisos"] = False
+            if previsoes:
+                try:
+                    res["inmet"] = fontes.previsao_inmet(res["ibge"]) if res["ibge"] else []
+                except Exception:
+                    res["inmet"] = False
+                try:
+                    r = fontes.previsao_cptec(cidade)
+                    res["cptec_id"], res["cptec"] = r if r else (None, [])
+                except Exception:
+                    res["cptec"] = False
+            main_thread(self._ao_receber_oficiais, cidade, res)
+
+        threading.Thread(target=trabalho, daemon=True).start()
+
+    def _ao_receber_oficiais(self, cidade, res):
+        k = chave(cidade)
+        if k not in self._linhas:  # cidade removida enquanto buscava
+            return
+        mudou = False
+        for campo, valor in (("ibge", res.get("ibge")), ("cptec", res.get("cptec_id"))):
+            if valor and cidade.get(campo) != valor:
+                cidade[campo] = valor
+                mudou = True
+        if mudou:
+            self.store.salvar()
+        of = self.oficiais.setdefault(k, {})
+        for campo in ("avisos", "inmet", "cptec"):
+            if campo in res:
+                of[campo] = res[campo]
+
+        avisos = res.get("avisos")
+        if isinstance(avisos, list):
+            conhecidos = self._avisos_vistos.get(k)
+            if conhecidos is not None and cfg.get("alertas"):
+                for a in avisos:
+                    if a["id"] not in conhecidos:
+                        self._notificar_aviso(cidade, a)
+            self._avisos_vistos[k] = (conhecidos or set()) | {a["id"] for a in avisos}
+
+        if self.cidade is not None and chave(self.cidade) == k:
+            self._mostrar_oficiais()
+
+    def _notificar_aviso(self, cidade, aviso):
+        n = Gio.Notification.new(f"Aviso do INMET em {cidade['nome']}")
+        n.set_body(f"{aviso['titulo']} — {aviso['severidade']} (até {aviso['fim']}).")
+        n.set_icon(Gio.ThemedIcon.new("weather-severe-alert-symbolic"))
+        self.get_application().send_notification(f"aviso-{chave(cidade)}-{aviso['id']}", n)
+
+    def _mostrar_oficiais(self):
+        self._mostrar_avisos()
+        self._mostrar_fontes()
+
+    @staticmethod
+    def _limpar(container):
+        while (filho := container.get_first_child()) is not None:
+            container.remove(filho)
+
+    def _mostrar_avisos(self):
+        cidade = self.cidade
+        ativo = cidade is not None and self._fontes_ativas(cidade)
+        self.secao_avisos.set_visible(ativo)
+        if not ativo:
+            return
+        self._limpar(self.avisos_box)
+        avisos = self.oficiais.get(chave(cidade), {}).get("avisos")
+        if avisos is None:
+            self.avisos_box.append(self._card_simples("Consultando avisos do INMET…"))
+        elif avisos is False:
+            self.avisos_box.append(
+                self._card_simples("Não foi possível consultar os avisos do INMET agora.")
+            )
+        elif not avisos:
+            self.avisos_box.append(
+                self._card_simples("Nenhum aviso oficial ativo para esta cidade.")
+            )
+        else:
+            for a in avisos:
+                self.avisos_box.append(self._card_aviso(a))
+
+    @staticmethod
+    def _card_simples(texto):
+        card = Gtk.Box(css_classes=["clima-card", "clima-aviso"])
+        card.append(rotulo(texto, ["clima-meta"], wrap=True))
+        return card
+
+    @staticmethod
+    def _card_aviso(a):
+        classe = {"Perigo Potencial": "sev-potencial", "Perigo": "sev-perigo",
+                  "Grande Perigo": "sev-grande"}.get(a["severidade"], "sev-potencial")
+        cab = Gtk.Box(spacing=10)
+        cab.append(rotulo(a["severidade"], ["clima-chip", classe], valign=Gtk.Align.CENTER))
+        cab.append(rotulo(a["titulo"], ["heading"], hexpand=True))
+        cab.append(rotulo(f'até {a["fim"]}', ["clima-meta"], valign=Gtk.Align.CENTER))
+
+        corpo = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4, margin_top=10)
+        corpo.append(rotulo(f'Vigente de {a["inicio"]} até {a["fim"]}', ["clima-meta"]))
+        for titulo, itens in (("Riscos", a["riscos"]), ("O que fazer", a["instrucoes"])):
+            if itens:
+                corpo.append(rotulo(titulo, ["clima-secao"]))
+                for item in itens:
+                    corpo.append(rotulo(f"• {item}", wrap=True))
+        corpo.append(rotulo("Fonte: INMET", ["clima-meta"], margin_top=4))
+
+        exp = Gtk.Expander(label_widget=cab, child=corpo)
+        card = Gtk.Box(css_classes=["clima-card", "clima-alerta", classe])
+        card.append(exp)
+        exp.set_hexpand(True)
+        return card
+
+    def _mostrar_fontes(self):
+        cidade = self.cidade
+        d = self.dados.get(chave(cidade)) if cidade is not None else None
+        ativo = d is not None and self._fontes_ativas(cidade)
+        self.secao_fontes.set_visible(ativo)
+        if not ativo:
+            return
+        of = self.oficiais.get(chave(cidade), {})
+        om = {x["data"]: x for x in modelo.dias(d)}
+        datas = sorted(om)[:4]
+        self._limpar(self.grade_fontes)
+
+        def por_data(lista):
+            if lista is None:
+                return "carregando"
+            if not lista:
+                return "indisponivel"
+            return {x["data"]: x for x in lista}
+
+        def dica_om(x):
+            return f'{descrever(x["codigo"])[0]}\nChance de chuva: {x["chuva"]}%'
+
+        def dica_inmet(x):
+            u = x["umidade"]
+            return (f'{x["resumo"]}\nUmidade: {u[0]}–{u[1]}%\nVento: {x["vento"]}'
+                    if u[0] is not None else f'{x["resumo"]}\nVento: {x["vento"]}')
+
+        def dica_cptec(x):
+            return f'{x["resumo"]}\nÍndice UV: {x["uv"]}'
+
+        grade = self.grade_fontes
+        grade.attach(rotulo("Fonte", ["clima-meta"]), 0, 0, 1, 1)
+        for j, dt in enumerate(datas, start=1):
+            r = rotulo(modelo.nome_dia(j - 1, dt), ["clima-meta"])
+            r.set_halign(Gtk.Align.CENTER)
+            grade.attach(r, j, 0, 1, 1)
+
+        linhas = (
+            ("Open-Meteo", om, dica_om),
+            ("INMET", por_data(of.get("inmet")), dica_inmet),
+            ("CPTEC/INPE", por_data(of.get("cptec")), dica_cptec),
+        )
+        for i, (nome, dados_f, dica) in enumerate(linhas, start=1):
+            grade.attach(rotulo(nome, ["heading"]), 0, i, 1, 1)
+            for j, dt in enumerate(datas, start=1):
+                x = dados_f.get(dt) if isinstance(dados_f, dict) else None
+                if dados_f == "carregando":
+                    texto, tip = "…", "Consultando…"
+                elif x is None or x["max"] is None or x["min"] is None:
+                    texto, tip = "—", "Sem dados desta fonte para este dia"
+                else:
+                    texto, tip = f'{cfg.fmt_temp(x["max"])} / {cfg.fmt_temp(x["min"])}', dica(x)
+                cel = rotulo(texto, ["clima-valor"], tooltip_text=tip)
+                cel.set_halign(Gtk.Align.CENTER)
+                grade.attach(cel, j, i, 1, 1)
+
+        inmet = of.get("inmet")
+        extra = ""
+        if inmet:
+            hoje = inmet[0]
+            if hoje.get("nascer") and hoje.get("ocaso"):
+                extra = f' Sol: nasce {hoje["nascer"]}, põe {hoje["ocaso"]} (INMET).'
+        self.rodape_fontes.set_label(
+            "Máxima / mínima de cada fonte; passe o mouse para ver o resumo." + extra
+        )

@@ -40,6 +40,20 @@ class Preferencias(Adw.PreferencesDialog):
             ligado.bind_property("active", linha, "sensitive", GObject.BindingFlags.SYNC_CREATE)
             alertas.add(linha)
         pagina.add(alertas)
+
+        oficiais = Adw.PreferencesGroup(
+            title="Fontes oficiais (Brasil)",
+            description="Valem só para cidades no Brasil. Os avisos novos também geram "
+            "notificação quando os alertas estão ligados.",
+        )
+        br = Adw.SwitchRow(
+            title="Avisos e previsões oficiais",
+            subtitle="INMET (avisos e previsão) e CPTEC/INPE",
+            active=cfg.get("fontes_br"),
+        )
+        br.connect("notify::active", lambda r, _p: self._set("fontes_br", r.get_active()))
+        oficiais.add(br)
+        pagina.add(oficiais)
         self.add(pagina)
 
     def _combo(self, titulo, chave, opcoes):
