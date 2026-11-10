@@ -3,7 +3,7 @@ import time
 
 from gi.repository import Adw, Gio, GLib, GObject, Gtk
 
-from . import api, fontes, modelo
+from . import APP_ID, __version__, api, fontes, modelo
 from .busca import DialogoBusca
 from .codigos import ambiente, descrever
 from .config import cfg
@@ -53,6 +53,9 @@ class Janela(Adw.ApplicationWindow):
         acao = Gio.SimpleAction.new("preferencias", None)
         acao.connect("activate", lambda *_: Preferencias(self._ao_mudar_config).present(self))
         self.add_action(acao)
+        sobre = Gio.SimpleAction.new("sobre", None)
+        sobre.connect("activate", lambda *_: self._mostrar_sobre())
+        self.add_action(sobre)
         app.set_accels_for_action("win.preferencias", ["<Ctrl>comma"])
 
         self._montar()
@@ -77,6 +80,7 @@ class Janela(Adw.ApplicationWindow):
         head.pack_start(add)
         menu = Gio.Menu()
         menu.append("Preferências", "win.preferencias")
+        menu.append("Sobre o Clima", "win.sobre")
         head.pack_end(
             Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu,
                            tooltip_text="Menu")
@@ -409,6 +413,31 @@ class Janela(Adw.ApplicationWindow):
         if minutos <= 0:
             return "Chovendo agora"
         return f"Chuva prevista em cerca de {minutos} min"
+
+    # ---------- sobre ----------
+    def _mostrar_sobre(self):
+        d = Adw.AboutDialog(
+            application_name="Clima",
+            application_icon=APP_ID,
+            developer_name="Breno Cocheto",
+            version=__version__,
+            website="https://github.com/bcocheto/clima",
+            issue_url="https://github.com/bcocheto/clima/issues",
+            license_type=Gtk.License.GPL_3_0,
+            copyright="© 2026 Breno Cocheto",
+            comments="Previsão do tempo com avisos oficiais no Brasil.",
+        )
+        d.add_link("Dados meteorológicos: Open-Meteo.com", "https://open-meteo.com/")
+        d.add_legal_section(
+            "Fontes de dados",
+            None,
+            Gtk.License.CUSTOM,
+            'Dados meteorológicos de <a href="https://open-meteo.com/">Open-Meteo.com</a> '
+            '(licença <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>).\n\n'
+            "Para cidades no Brasil: avisos e previsões do INMET, previsão do CPTEC/INPE "
+            "(via BrasilAPI) e códigos de município do IBGE.",
+        )
+        d.present(self)
 
     # ---------- preferências ----------
     def _ao_mudar_config(self):

@@ -1,9 +1,14 @@
 [Desktop Entry]
 Type=Application
 Name=Clima
-Comment=Previsão do tempo
-Exec=python3 -m clima
+GenericName=Previsão do tempo
+GenericName[pt_BR]=Previsão do tempo
+Comment=Previsão do tempo com avisos oficiais no Brasil
+Comment[pt_BR]=Previsão do tempo com avisos oficiais no Brasil
+Exec=clima
 Icon=io.github.bcocheto.Clima
+Terminal=false
 Categories=GNOME;GTK;Utility;
+Keywords=clima;tempo;previsão;chuva;temperatura;INMET;weather;forecast;
 StartupNotify=true
-DBusActivatable=false
+X-GNOME-UsesNotifications=true

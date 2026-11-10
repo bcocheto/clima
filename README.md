@@ -61,6 +61,15 @@ make install            # opcional: atalho no menu, ícone e notificações
 
 `make uninstall` remove o atalho e os ícones. As cidades e as preferências ficam em `~/.config/clima/`.
 
+### Flatpak
+
+O manifesto está em [`packaging/flatpak`](packaging/flatpak/io.github.bcocheto.Clima.yaml). Para compilar e instalar localmente (precisa do `flatpak-builder` e do runtime `org.gnome.Sdk//50`):
+
+```bash
+flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/io.github.bcocheto.Clima.yaml
+flatpak run io.github.bcocheto.Clima
+```
+
 ## 🌐 Fontes de dados
 
 | Fonte | Uso |
@@ -95,6 +104,7 @@ config + store ──► preferências e cidades salvas
 | `make test` | Roda os testes (`unittest`) |
 | `make install` | Instala o atalho, os ícones e o `.desktop` para o seu usuário |
 | `make uninstall` | Remove o que o `make install` instalou |
+| `meson setup build && meson install -C build` | Instalação padrão (usada pelo Flatpak) |
 
 ## 🗺️ Próximos passos
 
@@ -103,7 +113,8 @@ config + store ──► preferências e cidades salvas
 - [x] Avisos e previsões oficiais do Brasil (INMET, CPTEC/INPE)
 - [ ] Dados observados das estações do INMET (a API pública está sem resposta)
 - [ ] Localização automática
-- [ ] Empacotamento em Flatpak
+- [x] Tela Sobre, metadados AppStream e manifesto Flatpak
+- [ ] Publicar no Flathub
 - [ ] Tradução (gettext)
 - [ ] Mais órgãos oficiais, além do Brasil
 

@@ -1,0 +1,26 @@
+# Manifesto Flatpak do Clima.
+# Teste local:  flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/io.github.bcocheto.Clima.yaml
+# Para o Flathub, troque a fonte "dir" abaixo por:
+#   - type: git
+#     url: https://github.com/bcocheto/clima.git
+#     tag: v0.1.1
+#     commit: <hash do commit da tag>
+app-id: io.github.bcocheto.Clima
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: clima
+
+finish-args:
+  - --share=ipc
+  - --share=network        # Open-Meteo, INMET, CPTEC/INPE (BrasilAPI) e IBGE
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+
+modules:
+  - name: clima
+    buildsystem: meson
+    sources:
+      - type: dir
+        path: ../..

@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+"""Ponto de entrada instalado pelo meson (flatpak, pacote)."""
+from clima.app import main
+
+raise SystemExit(main())
