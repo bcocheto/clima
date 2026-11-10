@@ -1,43 +1,112 @@
+<div align="center">
+
+<img src="data/icons/hicolor/scalable/apps/io.github.bcocheto.Clima.svg" width="96" alt="Ícone do Clima">
+
 # Clima
 
-App de clima para GNOME (Python + GTK4 + libadwaita). Dados da [Open-Meteo](https://open-meteo.com) (sem chave).
+**Previsão do tempo para o GNOME, com cara de app nativo.**
+Clima agora, próximas 24 horas, 7 dias, várias cidades — e, no Brasil, avisos oficiais do INMET e comparação entre previsões.
 
-- Clima atual e previsão de 7 dias
-- Próximas 24 h com gráfico de temperatura e chance de chuva
-- Várias cidades com busca (lista salva em `~/.config/clima/cidades.json`)
-- Dicas ao passar o mouse: cada hora do gráfico, cada dia e cada card explicam o que significam
-- Barra lateral com ícone e temperatura atual de cada cidade
-- Preferências (Ctrl+, ou menu ⋮): °C/°F, km/h/mph/m/s, alerta de chuva ligado/desligado, antecedência (30 min a 2 h) e intervalo de atualização (salvas em `~/.config/clima/config.json`)
-- Cidades no Brasil: avisos oficiais do INMET (severidade, riscos e o que fazer), comparação de máx/mín entre Open-Meteo, INMET e CPTEC/INPE, e notificação de aviso novo (pode ser desligado nas Preferências)
-- Alerta de chuva por notificação do sistema enquanto o app está aberto
+![GTK4](https://img.shields.io/badge/GTK-4-4a86cf?logo=gnome&logoColor=white)
+![libadwaita](https://img.shields.io/badge/libadwaita-1.6%2B-3584e4)
+![Python](https://img.shields.io/badge/Python-3-3776ab?logo=python&logoColor=white)
+![Licença](https://img.shields.io/badge/licen%C3%A7a-GPL--3.0-blue)
+![Status](https://img.shields.io/badge/status-beta-orange)
+![Sem chave de API](https://img.shields.io/badge/API-sem%20chave-success)
 
-## Rodar
+<img src="docs/screenshots/01-principal.png" width="760" alt="Clima mostrando Ametista do Sul com avisos do INMET, detalhes e gráfico das próximas 24 horas">
+
+</div>
+
+---
+
+## ✨ Funcionalidades
+
+| | Recurso | Detalhe |
+|---|---|---|
+| 🌤️ | **Clima agora** | Temperatura grande, sensação térmica, umidade, vento e chance de chuva, com o fundo mudando conforme o tempo (céu limpo, noite, nublado, chuva, tempestade, neve, neblina) |
+| 📈 | **Próximas 24 horas** | Gráfico de temperatura com a chance de chuva em barras; passe o mouse numa hora para ver os detalhes |
+| 🗓️ | **7 dias** | Máxima, mínima e chance de chuva de cada dia, com dica ao passar o mouse |
+| 🏙️ | **Várias cidades** | Busca por nome; a barra lateral mostra o ícone e a temperatura atual de cada uma |
+| 🇧🇷 | **Avisos do INMET** | Alertas oficiais que cobrem a cidade, com severidade, riscos e o que fazer |
+| ⚖️ | **Comparar fontes** | Máxima e mínima lado a lado: Open-Meteo, INMET e CPTEC/INPE |
+| 🔔 | **Notificações** | Aviso de chuva nas próximas horas e de aviso novo do INMET |
+| ⚙️ | **Preferências** | °C/°F, km/h, mph ou m/s, antecedência do alerta, intervalo de atualização e fontes oficiais |
+| 🎨 | **Visual do Gavetta** | Cards translúcidos, cantos arredondados e chips em pílula, como no [Gavetta](https://github.com/bcocheto/gavetta) e na [Cadência](https://github.com/bcocheto/cadencia) |
+| 🌗 | **Cores do sistema** | Segue o tema claro/escuro e a cor de destaque do GNOME |
+
+## 📸 Capturas
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/03-aviso-inmet.png" width="380" alt="Aviso do INMET expandido"><br><sub>Aviso oficial do INMET, com riscos e orientações</sub></td>
+    <td align="center"><img src="docs/screenshots/02-comparar-fontes.png" width="380" alt="Comparação entre Open-Meteo, INMET e CPTEC"><br><sub>Previsão de 7 dias e comparação entre fontes</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/04-tema-claro.png" width="380" alt="Tema claro, chovendo em Lisboa"><br><sub>Tema claro, com fundo de chuva</sub></td>
+    <td align="center"><img src="docs/screenshots/05-preferencias.png" width="380" alt="Janela de preferências"><br><sub>Preferências: unidades, alertas e fontes oficiais</sub></td>
+  </tr>
+</table>
+
+## 📦 Instalação
+
+> Requer **GTK 4.14+**, **libadwaita 1.6+** e **PyGObject** (`python3-gi`). Testado no GNOME 50.
 
 ```bash
-python3 -m clima
+git clone https://github.com/bcocheto/clima.git
+cd clima
+python3 -m clima        # rodar direto
+make install            # opcional: atalho no menu, ícone e notificações
 ```
 
-Para ter o atalho no menu, o ícone e as notificações do GNOME (o ID precisa casar com `io.github.bcocheto.Clima`):
+`make uninstall` remove o atalho e os ícones. As cidades e as preferências ficam em `~/.config/clima/`.
 
-```bash
-make install     # make uninstall para remover
-```
-
-## Testes
-
-```bash
-make test
-```
-
-## Fontes
+## 🌐 Fontes de dados
 
 | Fonte | Uso |
 |---|---|
-| [Open-Meteo](https://open-meteo.com) | previsão principal e busca de cidades |
-| [INMET](https://apiprevmet3.inmet.gov.br) | avisos ativos e previsão por município (Brasil) |
-| [CPTEC/INPE](https://brasilapi.com.br) via BrasilAPI | previsão de 4 dias com índice UV (Brasil) |
-| [IBGE](https://servicodados.ibge.gov.br) | código do município, guardado em `~/.cache/clima/municipios.json` |
+| [Open-Meteo](https://open-meteo.com) | Previsão principal e busca de cidades (sem chave de API) |
+| [INMET](https://apiprevmet3.inmet.gov.br) | Avisos ativos e previsão por município — só cidades no Brasil |
+| [CPTEC/INPE](https://brasilapi.com.br) via BrasilAPI | Previsão de 4 dias com índice UV — só cidades no Brasil |
+| [IBGE](https://servicodados.ibge.gov.br) | Código do município (usado pelo INMET), guardado em `~/.cache/clima/` |
 
-## Licença
+As fontes oficiais valem para cidades no Brasil e podem ser desligadas nas Preferências. O app só consulta essas APIs; nada é enviado além do nome ou das coordenadas da cidade.
 
-GPL-3.0, como o [Gavetta](https://github.com/bcocheto/gavetta) e a [Cadência](https://github.com/bcocheto/cadencia).
+## 🧩 Como funciona
+
+```
+Open-Meteo ──► modelo ──► janela (tempo agora, 24 h, 7 dias, cidades)
+INMET / CPTEC / IBGE ──► fontes ──► avisos e comparação (cidades no Brasil)
+config + store ──► preferências e cidades salvas
+```
+
+- `api.py`: Open-Meteo (previsão e busca de cidades).
+- `fontes.py`: INMET, CPTEC/INPE e IBGE (funções puras testáveis, sem rede nos testes).
+- `modelo.py`: horas, dias e chuva próxima a partir da resposta da API.
+- `janela.py` e `busca.py`: a interface; `grafico.py` desenha o gráfico com GtkSnapshot.
+- `estilo.css`: o visual, com as cores do tema do sistema.
+- `config.py`, `prefs.py` e `store.py`: preferências e cidades.
+
+## 🛠️ Desenvolvimento
+
+| Comando | O que faz |
+|---|---|
+| `python3 -m clima` | Roda o app direto do código-fonte |
+| `make test` | Roda os testes (`unittest`) |
+| `make install` | Instala o atalho, os ícones e o `.desktop` para o seu usuário |
+| `make uninstall` | Remove o que o `make install` instalou |
+
+## 🗺️ Próximos passos
+
+- [x] Clima atual, 24 horas e 7 dias
+- [x] Várias cidades, preferências e alerta de chuva
+- [x] Avisos e previsões oficiais do Brasil (INMET, CPTEC/INPE)
+- [ ] Dados observados das estações do INMET (a API pública está sem resposta)
+- [ ] Localização automática
+- [ ] Empacotamento em Flatpak
+- [ ] Tradução (gettext)
+- [ ] Mais órgãos oficiais, além do Brasil
+
+## 📄 Licença
+
+[GPL-3.0](LICENSE) © Breno Cocheto
