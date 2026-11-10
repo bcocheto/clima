@@ -4,6 +4,7 @@ from pathlib import Path
 
 from clima import modelo
 from clima.codigos import descrever
+from clima.config import Config
 from clima.store import Store
 
 DADOS = {
@@ -12,6 +13,7 @@ DADOS = {
         "time": [f"2026-11-10T{h:02d}:00" for h in range(10, 16)],
         "temperature_2m": [20, 21, 22, 23, 24, 25],
         "precipitation_probability": [0, 0, 10, None, 50, 80],
+        "weather_code": [0, 1, 2, 3, 61, 95],
     },
     "daily": {
         "time": ["2026-11-10", "2026-11-11", "2026-11-12"],
@@ -31,7 +33,7 @@ DADOS = {
 class TestModelo(unittest.TestCase):
     def test_horas_comecam_na_hora_atual(self):
         horas = modelo.horas_seguintes(DADOS)
-        self.assertEqual(horas[0], ("12:00", 22, 10))
+        self.assertEqual(horas[0], ("12:00", 22, 10, 2))
         self.assertEqual(horas[1][2], 0)  # None vira 0
         self.assertEqual(len(horas), 4)
 
@@ -68,6 +70,28 @@ class TestStore(unittest.TestCase):
             self.assertEqual(len(Store(caminho).cidades), 2)
             s.remover(c)
             self.assertEqual(len(Store(caminho).cidades), 1)
+
+
+class TestConfig(unittest.TestCase):
+    def test_unidades_e_persistencia(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            caminho = Path(tmp) / "config.json"
+            c = Config(caminho)
+            self.assertEqual(c.fmt_temp(20), "20°")
+            self.assertEqual(c.fmt_vento(36), "36 km/h")
+            c.set("temperatura", "F")
+            c.set("vento", "ms")
+            self.assertEqual(c.fmt_temp(20), "68°")
+            self.assertEqual(c.fmt_vento(36), "10 m/s")
+            c2 = Config(caminho)  # recarrega do disco
+            self.assertEqual(c2.get("temperatura"), "F")
+            self.assertEqual(c2.texto_janela(), "2 horas")
+
+    def test_ignora_valor_invalido(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            caminho = Path(tmp) / "config.json"
+            caminho.write_text('{"temperatura": 5, "x": 1}', encoding="utf-8")
+            self.assertEqual(Config(caminho).get("temperatura"), "C")
 
 
 if __name__ == "__main__":

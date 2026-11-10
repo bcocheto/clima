@@ -5,15 +5,15 @@ _DIAS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
 
 
 def horas_seguintes(dados, n=24):
-    """Lista de (HH:MM, temperatura, prob. de chuva %) a partir da hora atual."""
+    """Lista de (HH:MM, temperatura, prob. de chuva %, código do tempo) a partir da hora atual."""
     inicio = dados["current"]["time"][:13] + ":00"
     h = dados["hourly"]
     saida = []
-    for t, temp, prob in zip(
-        h["time"], h["temperature_2m"], h["precipitation_probability"]
+    for t, temp, prob, cod in zip(
+        h["time"], h["temperature_2m"], h["precipitation_probability"], h["weather_code"]
     ):
         if t >= inicio:
-            saida.append((t[11:16], temp, prob or 0))
+            saida.append((t[11:16], temp, prob or 0, cod))
             if len(saida) == n:
                 break
     return saida

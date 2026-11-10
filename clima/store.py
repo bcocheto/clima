@@ -12,9 +12,13 @@ def chave(cidade):
     return f"{cidade['lat']:.2f},{cidade['lon']:.2f}"
 
 
-def _caminho_padrao():
+def pasta_config():
     base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
-    return base / "clima" / "cidades.json"
+    return base / "clima"
+
+
+def _caminho_padrao():
+    return pasta_config() / "cidades.json"
 
 
 class Store:
