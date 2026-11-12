@@ -5,6 +5,8 @@ Os tiles são baixados em threads e desenhados com GtkSnapshot (sem WebKit/libsh
 """
 import math
 import threading
+import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -26,6 +28,27 @@ TAM = 256
 ZOOM_MIN, ZOOM_MAX = 4, 7  # o RainViewer só entrega tiles de radar até o zoom 7
 ZOOM_PADRAO = 7
 PASSO_MS = 650
+PAUSA_FINAL_MS = 1500  # respiro no quadro mais recente antes de recomeçar o loop
+ATUALIZAR_S = 600
+CACHE_MAX = 220  # texturas de 256x256 (~256 KB cada na GPU)
+FALHA_S = 60  # não repetir tile que falhou por um minuto
+
+_CACHE = OrderedDict()  # url -> Gdk.Texture, compartilhado entre o mini-radar e o diálogo
+_FALHAS = {}  # url -> instante da falha
+
+
+def _cache_get(url):
+    tex = _CACHE.get(url)
+    if tex is not None:
+        _CACHE.move_to_end(url)
+    return tex
+
+
+def _cache_put(url, tex):
+    _CACHE[url] = tex
+    _CACHE.move_to_end(url)
+    while len(_CACHE) > CACHE_MAX:
+        _CACHE.popitem(last=False)
 
 
 # ---------- matemática de tiles (pura) ----------
@@ -99,15 +122,21 @@ def eco_no_ponto(lat, lon):
 
 # ---------- widget ----------
 class RadarView(Gtk.Widget):
-    def __init__(self, lat, lon, ao_mudar_quadro=None):
-        super().__init__(hexpand=True, vexpand=True, overflow=Gtk.Overflow.HIDDEN)
+    def __init__(self, lat, lon, ao_mudar_quadro=None, interativo=True, altura=None, max_passados=None):
+        # mini-radar: sem gestos (não briga com a rolagem da página), altura fixa, menos quadros
+        super().__init__(hexpand=True, vexpand=altura is None, overflow=Gtk.Overflow.HIDDEN)
         self.lat, self.lon = lat, lon
+        self.altura = altura
+        self.max_passados = max_passados
+        self.interativo = interativo
+        self.automatico = not interativo  # o mini anima sozinho; o diálogo espera o play
+        self._geracao = 0
+        self._atualizando = None
         self.z = ZOOM_PADRAO
         self.cx, self.cy = mundo_px(lat, lon, self.z)
         self.host, self.quadros = "", []
         self.indice = 0
         self.ao_mudar_quadro = ao_mudar_quadro
-        self.texturas = {}  # url -> Gdk.Texture
         self.pedidos = set()
         self.tocando = False
         self._timer = None
@@ -115,13 +144,19 @@ class RadarView(Gtk.Widget):
         self._arraste = None
         self.add_css_class("clima-radar")
 
-        arrasto = Gtk.GestureDrag()
-        arrasto.connect("drag-begin", lambda *_: setattr(self, "_arraste", (self.cx, self.cy)))
-        arrasto.connect("drag-update", self._ao_arrastar)
-        self.add_controller(arrasto)
-        rolagem = Gtk.EventControllerScroll(flags=Gtk.EventControllerScrollFlags.VERTICAL)
-        rolagem.connect("scroll", lambda _c, _dx, dy: (self.mudar_zoom(-1 if dy > 0 else 1), True)[1])
-        self.add_controller(rolagem)
+        if interativo:
+            arrasto = Gtk.GestureDrag()
+            arrasto.connect("drag-begin", lambda *_: setattr(self, "_arraste", (self.cx, self.cy)))
+            arrasto.connect("drag-update", self._ao_arrastar)
+            self.add_controller(arrasto)
+            rolagem = Gtk.EventControllerScroll(flags=Gtk.EventControllerScrollFlags.VERTICAL)
+            rolagem.connect(
+                "scroll", lambda _c, _dx, dy: (self.mudar_zoom(-1 if dy > 0 else 1), True)[1]
+            )
+            self.add_controller(rolagem)
+        # só gasta CPU/rede enquanto está na tela
+        self.connect("map", lambda *_: self._ao_aparecer())
+        self.connect("unmap", lambda *_: self._ao_sumir())
         self.connect("destroy", lambda *_: self.parar())
 
     # --- dados ---
@@ -137,6 +172,9 @@ class RadarView(Gtk.Widget):
         threading.Thread(target=trabalho, daemon=True).start()
 
     def _receber(self, host, quadros, ao_pronto):
+        if self.max_passados:
+            passados = [q for q in quadros if not q[2]][-self.max_passados:]
+            quadros = passados + [q for q in quadros if q[2]]
         self.host, self.quadros = host, quadros
         passados = [i for i, q in enumerate(quadros) if not q[2]]
         self.indice = passados[-1] if passados else 0
@@ -144,6 +182,40 @@ class RadarView(Gtk.Widget):
         ao_pronto()
         self._prefetch_todos()
         self._notificar()
+        if self.automatico and self.get_mapped():
+            self._agendar()
+
+    # --- ciclo de vida ---
+    def _animar_permitido(self):
+        cfg = Gtk.Settings.get_default()
+        return bool(cfg.get_property("gtk-enable-animations")) if cfg else True
+
+    def _ao_aparecer(self):
+        if self.automatico and self.quadros and self._animar_permitido():
+            self._agendar()
+        if self._atualizando is None:
+            self._atualizando = GLib.timeout_add_seconds(ATUALIZAR_S, self._reatualizar)
+
+    def _ao_sumir(self):
+        self._parar_timer()
+        if self._atualizando is not None:
+            GLib.source_remove(self._atualizando)
+            self._atualizando = None
+
+    def _reatualizar(self):
+        if self.quadros:
+            self.carregar(lambda: None, lambda e: None)
+        return True
+
+    def definir_cidade(self, lat, lon):
+        if (lat, lon) == (self.lat, self.lon):
+            return
+        self.lat, self.lon = lat, lon
+        self._geracao += 1  # descarta respostas de tiles pedidos para a cidade anterior
+        self.pedidos.clear()
+        self.cx, self.cy = mundo_px(lat, lon, self.z)
+        self.queue_draw()
+        self._prefetch_todos()
 
     def _notificar(self):
         if self.ao_mudar_quadro and self.quadros:
@@ -154,26 +226,42 @@ class RadarView(Gtk.Widget):
     def ir_para(self, i):
         if not self.quadros:
             return
-        self.indice = max(0, min(len(self.quadros) - 1, int(i)))
+        i = max(0, min(len(self.quadros) - 1, int(i)))
+        if i == self.indice and self.get_mapped():
+            return
+        self.indice = i
         self.queue_draw()
         self._notificar()
 
-    def tocar(self, sim):
-        self.tocando = sim
+    def _parar_timer(self):
         if self._timer:
             GLib.source_remove(self._timer)
             self._timer = None
+
+    def _agendar(self):
+        self._parar_timer()
+        ultimo = self.quadros and self.indice == len(self.quadros) - 1
+        self._timer = GLib.timeout_add(PAUSA_FINAL_MS if ultimo else PASSO_MS, self._avancar)
+
+    def tocar(self, sim):
+        self.tocando = sim
+        self._parar_timer()
         if sim:
-            self._timer = GLib.timeout_add(PASSO_MS, self._avancar)
+            self._agendar()
 
     def _avancar(self):
-        if not self.quadros:
-            return True
+        self._timer = None
+        if not self.quadros or not self.get_mapped():
+            return False
         self.ir_para((self.indice + 1) % len(self.quadros))
-        return True
+        if self.tocando or self.automatico:
+            self._agendar()
+        return False
 
     def parar(self):
-        self.tocar(False)
+        self.tocando = False
+        self.automatico = False
+        self._ao_sumir()
         self._pool.shutdown(wait=False, cancel_futures=True)
 
     def mudar_zoom(self, delta):
@@ -205,26 +293,32 @@ class RadarView(Gtk.Widget):
         return [(x % n, y, x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1) if 0 <= y < n]
 
     def _pedir(self, url):
-        if url in self.texturas or url in self.pedidos:
+        if url in self.pedidos or _cache_get(url) is not None:
+            return
+        if time.monotonic() - _FALHAS.get(url, -FALHA_S) < FALHA_S:
             return
         self.pedidos.add(url)
+        geracao = self._geracao
 
         def trabalho():
             try:
                 tex = Gdk.Texture.new_from_bytes(GLib.Bytes.new(baixar(url)))
             except Exception:
                 tex = None
-            GLib.idle_add(lambda: (self._chegou(url, tex), False)[1])
+            GLib.idle_add(lambda: (self._chegou(url, tex, geracao), False)[1])
 
         try:
             self._pool.submit(trabalho)
         except RuntimeError:  # janela fechando
             pass
 
-    def _chegou(self, url, tex):
+    def _chegou(self, url, tex, geracao):
         self.pedidos.discard(url)
-        if tex is not None:
-            self.texturas[url] = tex
+        if tex is None:
+            _FALHAS[url] = time.monotonic()
+            return
+        _cache_put(url, tex)  # vale para qualquer cidade: a URL já identifica o tile
+        if geracao == self._geracao:
             self.queue_draw()
 
     def _prefetch_todos(self):
@@ -240,7 +334,9 @@ class RadarView(Gtk.Widget):
 
     # --- desenho ---
     def do_measure(self, orientation, for_size):
-        return 320, 320, -1, -1
+        if orientation == Gtk.Orientation.VERTICAL and self.altura:
+            return self.altura, self.altura, -1, -1
+        return (200 if self.altura else 320), (200 if self.altura else 320), -1, -1
 
     def do_size_allocate(self, w, h, baseline):
         self._prefetch_todos()
@@ -258,7 +354,7 @@ class RadarView(Gtk.Widget):
             ret = Graphene.Rect().init(x, y, TAM, TAM)
             url = BASE_URL.format(z=self.z, x=tx, y=ty)
             self._pedir(url)
-            base = self.texturas.get(url)
+            base = _cache_get(url)
             if base:
                 if escuro:  # mapa claro vira cinza-escuro para o eco do radar aparecer
                     snapshot.push_opacity(0.55)
@@ -268,7 +364,7 @@ class RadarView(Gtk.Widget):
             if quadro:
                 url_r = url_radar(self.host, quadro[1], self.z, tx, ty)
                 self._pedir(url_r)
-                tex = self.texturas.get(url_r)
+                tex = _cache_get(url_r)
                 if tex:
                     snapshot.push_opacity(0.8)
                     snapshot.append_texture(tex, ret)
@@ -382,3 +478,73 @@ class DialogoRadar(Adw.Dialog):
         botao.set_icon_name(
             "media-playback-pause-symbolic" if botao.get_active() else "media-playback-start-symbolic"
         )
+
+
+class MiniRadar(Gtk.Overlay):
+    """Radar compacto e sempre animado para a tela principal; clique abre o diálogo completo."""
+
+    def __init__(self, abrir_dialogo):
+        super().__init__(css_classes=["clima-radar-card"], overflow=Gtk.Overflow.HIDDEN)
+        self.abrir_dialogo = abrir_dialogo
+        self.cidade = None
+        self._ok = False
+        self.radar = RadarView(
+            0, 0, self._quadro_mudou, interativo=False, altura=200, max_passados=6
+        )
+        self.set_child(self.radar)
+        self.pilula = Gtk.Label(
+            css_classes=["clima-radar-pilula", "numeric"], halign=Gtk.Align.START,
+            valign=Gtk.Align.END, margin_start=10, margin_bottom=10,
+        )
+        self.add_overlay(self.pilula)
+        self.add_overlay(Gtk.Image(
+            icon_name="view-fullscreen-symbolic", css_classes=["clima-radar-pilula"],
+            halign=Gtk.Align.END, valign=Gtk.Align.START, margin_end=10, margin_top=10,
+        ))
+        self.estado = Gtk.Label(
+            css_classes=["clima-radar-pilula"], halign=Gtk.Align.CENTER, valign=Gtk.Align.CENTER,
+        )
+        self.add_overlay(self.estado)
+        clique = Gtk.GestureClick()
+        clique.connect("released", self._ao_clicar)
+        self.add_controller(clique)
+        self.set_cursor(Gdk.Cursor.new_from_name("pointer"))
+        self.set_tooltip_text("Radar de chuva — clique para abrir em tela cheia")
+        self._mostrar_estado("Carregando radar…")
+
+    def _mostrar_estado(self, texto):
+        self.estado.set_label(texto or "")
+        self.estado.set_visible(bool(texto))
+        self.pilula.set_visible(not texto)
+
+    def definir_cidade(self, cidade):
+        self.cidade = cidade
+        self.radar.definir_cidade(cidade["lat"], cidade["lon"])
+        if not self.radar.quadros and not self._ok:
+            self._carregar()
+
+    def _carregar(self):
+        self._mostrar_estado("Carregando radar…")
+        self.radar.carregar(self._pronto, self._erro)
+
+    def _pronto(self):
+        self._ok = bool(self.radar.quadros)
+        self._mostrar_estado(None if self._ok else "Radar sem dados")
+
+    def _erro(self, _e):
+        self._ok = False
+        self._mostrar_estado("Radar indisponível · clique para tentar de novo")
+
+    def _quadro_mudou(self, _i, _n, ts, previsto):
+        self.pilula.set_label(
+            f"PREVISÃO · {hora_do_quadro(ts)}" if previsto else f"AO VIVO · {hora_do_quadro(ts)}"
+        )
+        self.pilula.set_css_classes(
+            ["clima-radar-pilula", "numeric"] + (["previsao"] if previsto else [])
+        )
+
+    def _ao_clicar(self, *_):
+        if not self._ok:
+            self._carregar()
+        elif self.cidade:
+            self.abrir_dialogo(self.cidade)

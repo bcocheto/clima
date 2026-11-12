@@ -9,7 +9,7 @@ from .codigos import ambiente, descrever
 from .config import cfg
 from .grafico import Grafico
 from .prefs import Preferencias
-from .radar import DialogoRadar
+from .radar import DialogoRadar, MiniRadar
 from .store import Store, chave
 
 
@@ -217,6 +217,11 @@ class Janela(Adw.ApplicationWindow):
         card.append(self.grafico)
         box.append(card)
 
+        # radar (mini, sempre animado) — fica junto das horas, que respondem "vai chover?"
+        box.append(rotulo("Radar de chuva", ["clima-secao"]))
+        self.mini_radar = MiniRadar(lambda c: DialogoRadar(c).present(self))
+        box.append(self.mini_radar)
+
         # próximos dias
         box.append(rotulo("Próximos 7 dias", ["clima-secao"]))
         self.dias_box = Gtk.FlowBox(
@@ -406,6 +411,7 @@ class Janela(Adw.ApplicationWindow):
             self.aviso.remove_css_class("chuva")
 
         self.grafico.set_horas(modelo.horas_seguintes(d))
+        self.mini_radar.definir_cidade(cidade)
 
         self.dias_box.remove_all()
         for i, dia_d in enumerate(dias):

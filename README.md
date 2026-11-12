@@ -26,7 +26,7 @@ Clima agora, próximas 24 horas, 7 dias, várias cidades — e, no Brasil, aviso
 |---|---|---|
 | 🌤️ | **Clima agora** | Temperatura grande, sensação térmica, umidade, vento e chance de chuva, com o fundo mudando conforme o tempo (céu limpo, noite, nublado, chuva, tempestade, neve, neblina) |
 | 🎯 | **Agora mais preciso** | A temperatura e a chuva de agora são corrigidas por consenso de 4 modelos, METAR de aeroportos próximos e radar, em vez de confiar num modelo só |
-| 🛰️ | **Radar de chuva** | Botão no topo abre o radar animado (últimas ~2 h e próximos minutos) sobre o mapa, com zoom e arrasto |
+| 🛰️ | **Radar de chuva** | Mini-radar sempre animado entre o gráfico de 24 h e os 7 dias (pausa quando a janela some); clique, ou o botão do topo, abre o radar completo com zoom e arrasto |
 | 📈 | **Próximas 24 horas** | Gráfico de temperatura com a chance de chuva em barras; passe o mouse numa hora para ver os detalhes |
 | 🗓️ | **7 dias** | Máxima, mínima e chance de chuva de cada dia, com dica ao passar o mouse |
 | 🏙️ | **Várias cidades** | Busca por nome; a barra lateral mostra o ícone e a temperatura atual de cada uma |
