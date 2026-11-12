@@ -57,5 +57,8 @@ def chuva_em_minutos(dados, limiar_mm=0.1, janela_min=120):
         if delta > janela_min:
             break
         if (mm or 0) >= limiar_mm:
-            return int(max(0, delta - 15))
+            minutos = int(max(0, delta - 15))
+            if minutos == 0 and dados.get("ajuste", {}).get("chovendo") is False:
+                continue  # o modelo diz que chove agora, mas o consenso/radar/METAR dizem que não
+            return minutos
     return None

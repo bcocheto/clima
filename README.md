@@ -25,6 +25,8 @@ Clima agora, próximas 24 horas, 7 dias, várias cidades — e, no Brasil, aviso
 | | Recurso | Detalhe |
 |---|---|---|
 | 🌤️ | **Clima agora** | Temperatura grande, sensação térmica, umidade, vento e chance de chuva, com o fundo mudando conforme o tempo (céu limpo, noite, nublado, chuva, tempestade, neve, neblina) |
+| 🎯 | **Agora mais preciso** | A temperatura e a chuva de agora são corrigidas por consenso de 4 modelos, METAR de aeroportos próximos e radar, em vez de confiar num modelo só |
+| 🛰️ | **Radar de chuva** | Mini-radar sempre animado entre o gráfico de 24 h e os 7 dias (pausa quando a janela some); clique, ou o botão do topo, abre o radar completo com zoom e arrasto |
 | 📈 | **Próximas 24 horas** | Gráfico de temperatura com a chance de chuva em barras; passe o mouse numa hora para ver os detalhes |
 | 🗓️ | **7 dias** | Máxima, mínima e chance de chuva de cada dia, com dica ao passar o mouse |
 | 🏙️ | **Várias cidades** | Busca por nome; a barra lateral mostra o ícone e a temperatura atual de cada uma |
@@ -75,6 +77,9 @@ flatpak run io.github.bcocheto.Clima
 | Fonte | Uso |
 |---|---|
 | [Open-Meteo](https://open-meteo.com) | Previsão principal e busca de cidades (sem chave de API) |
+| Open-Meteo (ICON, GFS, ECMWF) | Comparação entre modelos para corrigir o "agora" |
+| [Aviation Weather](https://aviationweather.gov) | METAR de aeroportos até 80 km (temperatura, umidade, chuva) |
+| [RainViewer](https://www.rainviewer.com) + [OpenStreetMap](https://www.openstreetmap.org/copyright) | Quadros do radar e mapa de fundo |
 | [INMET](https://apiprevmet3.inmet.gov.br) | Avisos ativos e previsão por município — só cidades no Brasil |
 | [CPTEC/INPE](https://brasilapi.com.br) via BrasilAPI | Previsão de 4 dias com índice UV — só cidades no Brasil |
 | [IBGE](https://servicodados.ibge.gov.br) | Código do município (usado pelo INMET), guardado em `~/.cache/clima/` |
@@ -91,6 +96,8 @@ config + store ──► preferências e cidades salvas
 
 - `api.py`: Open-Meteo (previsão e busca de cidades).
 - `fontes.py`: INMET, CPTEC/INPE e IBGE (funções puras testáveis, sem rede nos testes).
+- `observacao.py`: consenso entre modelos, METAR e radar para o "agora".
+- `radar.py`: radar do RainViewer sobre mapa OSM, desenhado com GtkSnapshot.
 - `modelo.py`: horas, dias e chuva próxima a partir da resposta da API.
 - `janela.py` e `busca.py`: a interface; `grafico.py` desenha o gráfico com GtkSnapshot.
 - `estilo.css`: o visual, com as cores do tema do sistema.

@@ -79,3 +79,19 @@
 .clima-chip.sev-potencial { background-color: #f5c211; color: #241f31; }
 .clima-chip.sev-perigo    { background-color: #ff7800; color: #241f31; }
 .clima-chip.sev-grande    { background-color: #e01b24; color: #ffffff; }
+
+/* mini-radar da tela principal: o mapa vai até a borda do card */
+.clima-radar-card {
+    border-radius: 14px;
+    border: 1px solid alpha(@window_fg_color, 0.06);
+    box-shadow: 0 1px 6px alpha(black, 0.12);
+}
+.clima-radar-pilula {
+    background-color: alpha(black, 0.5);
+    color: white;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+.clima-radar-pilula.previsao { background-color: alpha(#c64600, 0.85); }

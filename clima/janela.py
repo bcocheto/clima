@@ -3,12 +3,13 @@ import time
 
 from gi.repository import Adw, Gio, GLib, GObject, Gtk
 
-from . import APP_ID, __version__, api, fontes, modelo
+from . import APP_ID, __version__, api, fontes, modelo, observacao
 from .busca import DialogoBusca
 from .codigos import ambiente, descrever
 from .config import cfg
 from .grafico import Grafico
 from .prefs import Preferencias
+from .radar import DialogoRadar, MiniRadar
 from .store import Store, chave
 
 
@@ -108,6 +109,9 @@ class Janela(Adw.ApplicationWindow):
         refresh = Gtk.Button(icon_name="view-refresh-symbolic", tooltip_text="Atualizar")
         refresh.connect("clicked", lambda *_: self._carregar(forcar=True))
         head.pack_end(refresh)
+        radar = Gtk.Button(icon_name="weather-showers-symbolic", tooltip_text="Radar de chuva")
+        radar.connect("clicked", lambda *_: self.cidade and DialogoRadar(self.cidade).present(self))
+        head.pack_end(radar)
         tv.add_top_bar(head)
 
         self.stack = Gtk.Stack(transition_type=Gtk.StackTransitionType.CROSSFADE)
@@ -212,6 +216,11 @@ class Janela(Adw.ApplicationWindow):
         self.grafico = Grafico()
         card.append(self.grafico)
         box.append(card)
+
+        # radar (mini, sempre animado) — fica junto das horas, que respondem "vai chover?"
+        box.append(rotulo("Radar de chuva", ["clima-secao"]))
+        self.mini_radar = MiniRadar(lambda c: DialogoRadar(c).present(self))
+        box.append(self.mini_radar)
 
         # próximos dias
         box.append(rotulo("Próximos 7 dias", ["clima-secao"]))
@@ -355,7 +364,7 @@ class Janela(Adw.ApplicationWindow):
             if self.cidade is cidade and k in self.dados:
                 self._mostrar(cidade, self.dados[k])
 
-        em_thread(lambda: api.previsao(cidade["lat"], cidade["lon"]), ok, erro)
+        em_thread(lambda: observacao.previsao_refinada(cidade["lat"], cidade["lon"]), ok, erro)
 
     def _mostrar(self, cidade, d):
         atual = d["current"]
@@ -377,6 +386,10 @@ class Janela(Adw.ApplicationWindow):
         self.img_atual.set_tooltip_text(desc)
         self.lbl_temp.set_label(cfg.fmt_temp(atual["temperature_2m"]))
         self.lbl_desc.set_label(desc)
+        fontes_aj = d.get("ajuste", {}).get("fontes")
+        self.lbl_desc.set_tooltip_text(
+            "Ajustado por consenso: " + ", ".join(fontes_aj) if fontes_aj else None
+        )
         self.chip_minmax.set_label(
             f'Máx {cfg.fmt_temp(dias[0]["max"])} · Mín {cfg.fmt_temp(dias[0]["min"])}'
         )
@@ -398,6 +411,7 @@ class Janela(Adw.ApplicationWindow):
             self.aviso.remove_css_class("chuva")
 
         self.grafico.set_horas(modelo.horas_seguintes(d))
+        self.mini_radar.definir_cidade(cidade)
 
         self.dias_box.remove_all()
         for i, dia_d in enumerate(dias):
@@ -465,7 +479,7 @@ class Janela(Adw.ApplicationWindow):
         def trabalho():
             for c in cidades:
                 try:
-                    d = api.previsao(c["lat"], c["lon"])
+                    d = observacao.previsao_refinada(c["lat"], c["lon"])
                 except Exception:
                     continue
                 main_thread(self._ao_receber, c, d)
